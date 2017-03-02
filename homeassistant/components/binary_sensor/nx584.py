@@ -27,6 +27,8 @@ DEFAULT_HOST = 'localhost'
 DEFAULT_PORT = '5007'
 DEFAULT_SSL = False
 
+ZONE_NAME_PREFIX = 'nx584_zone_'
+
 ZONE_TYPES_SCHEMA = vol.Schema({
     cv.positive_int: vol.In(DEVICE_CLASSES),
 })
@@ -96,8 +98,8 @@ class NX584ZoneSensor(BinarySensorDevice):
 
     @property
     def name(self):
-        """Return the name of the binary sensor."""
-        return self._zone['name']
+        """Return the name of the binary sensor (including zone number)."""
+        return ZONE_NAME_PREFIX + str(self._zone['number'])
 
     @property
     def is_on(self):
