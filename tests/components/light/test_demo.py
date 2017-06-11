@@ -4,7 +4,7 @@ import asyncio
 import unittest
 
 from homeassistant.core import State, CoreState
-from homeassistant.bootstrap import setup_component, async_setup_component
+from homeassistant.setup import setup_component, async_setup_component
 import homeassistant.components.light as light
 from homeassistant.helpers.restore_state import DATA_RESTORE_CACHE
 
@@ -39,7 +39,7 @@ class TestDemoLight(unittest.TestCase):
         self.assertEqual((.4, .6), state.attributes.get(light.ATTR_XY_COLOR))
         self.assertEqual(25, state.attributes.get(light.ATTR_BRIGHTNESS))
         self.assertEqual(
-            (82, 91, 0), state.attributes.get(light.ATTR_RGB_COLOR))
+            (76, 95, 0), state.attributes.get(light.ATTR_RGB_COLOR))
         self.assertEqual('rainbow', state.attributes.get(light.ATTR_EFFECT))
         light.turn_on(
             self.hass, ENTITY_LIGHT, rgb_color=(251, 252, 253),
@@ -53,7 +53,14 @@ class TestDemoLight(unittest.TestCase):
         self.hass.block_till_done()
         state = self.hass.states.get(ENTITY_LIGHT)
         self.assertEqual(400, state.attributes.get(light.ATTR_COLOR_TEMP))
+        self.assertEqual(154, state.attributes.get(light.ATTR_MIN_MIREDS))
+        self.assertEqual(500, state.attributes.get(light.ATTR_MAX_MIREDS))
         self.assertEqual('none', state.attributes.get(light.ATTR_EFFECT))
+        light.turn_on(self.hass, ENTITY_LIGHT, kelvin=3000, brightness_pct=50)
+        self.hass.block_till_done()
+        state = self.hass.states.get(ENTITY_LIGHT)
+        self.assertEqual(333, state.attributes.get(light.ATTR_COLOR_TEMP))
+        self.assertEqual(127, state.attributes.get(light.ATTR_BRIGHTNESS))
 
     def test_turn_off(self):
         """Test light turn off method."""
@@ -61,6 +68,15 @@ class TestDemoLight(unittest.TestCase):
         self.hass.block_till_done()
         self.assertTrue(light.is_on(self.hass, ENTITY_LIGHT))
         light.turn_off(self.hass, ENTITY_LIGHT)
+        self.hass.block_till_done()
+        self.assertFalse(light.is_on(self.hass, ENTITY_LIGHT))
+
+    def test_turn_off_without_entity_id(self):
+        """Test light turn off all lights."""
+        light.turn_on(self.hass, ENTITY_LIGHT)
+        self.hass.block_till_done()
+        self.assertTrue(light.is_on(self.hass, ENTITY_LIGHT))
+        light.turn_off(self.hass)
         self.hass.block_till_done()
         self.assertFalse(light.is_on(self.hass, ENTITY_LIGHT))
 

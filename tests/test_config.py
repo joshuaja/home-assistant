@@ -1,8 +1,10 @@
 """Test config utils."""
 # pylint: disable=protected-access
+import asyncio
 import os
 import unittest
 import unittest.mock as mock
+from collections import OrderedDict
 
 import pytest
 from voluptuous import MultipleInvalid
@@ -205,6 +207,12 @@ class TestConfig(unittest.TestCase):
             },
         })
 
+    def test_customize_glob_is_ordered(self):
+        """Test that customize_glob preserves order."""
+        conf = config_util.CORE_CONFIG_SCHEMA(
+            {'customize_glob': OrderedDict()})
+        self.assertIsInstance(conf['customize_glob'], OrderedDict)
+
     def _compute_state(self, config):
         run_coroutine_threadsafe(
             config_util.async_process_ha_core_config(self.hass, config),
@@ -213,7 +221,7 @@ class TestConfig(unittest.TestCase):
         entity = Entity()
         entity.entity_id = 'test.test'
         entity.hass = self.hass
-        entity.update_ha_state()
+        entity.schedule_update_ha_state()
 
         self.hass.block_till_done()
 
@@ -292,6 +300,56 @@ class TestConfig(unittest.TestCase):
 
             assert mock_os.path.isdir.call_count == 0
             assert mock_shutil.rmtree.call_count == 0
+
+    @mock.patch('homeassistant.config.shutil')
+    @mock.patch('homeassistant.config.os')
+    def test_migrate_file_on_upgrade(self, mock_os, mock_shutil):
+        """Test migrate of config files on upgrade."""
+        ha_version = '0.7.0'
+
+        mock_os.path.isdir = mock.Mock(return_value=True)
+
+        mock_open = mock.mock_open()
+
+        def mock_isfile(filename):
+            return True
+
+        with mock.patch('homeassistant.config.open', mock_open, create=True), \
+                mock.patch('homeassistant.config.os.path.isfile', mock_isfile):
+            opened_file = mock_open.return_value
+            # pylint: disable=no-member
+            opened_file.readline.return_value = ha_version
+
+            self.hass.config.path = mock.Mock()
+
+            config_util.process_ha_config_upgrade(self.hass)
+
+        assert mock_os.rename.call_count == 1
+
+    @mock.patch('homeassistant.config.shutil')
+    @mock.patch('homeassistant.config.os')
+    def test_migrate_no_file_on_upgrade(self, mock_os, mock_shutil):
+        """Test not migrating config files on upgrade."""
+        ha_version = '0.7.0'
+
+        mock_os.path.isdir = mock.Mock(return_value=True)
+
+        mock_open = mock.mock_open()
+
+        def mock_isfile(filename):
+            return False
+
+        with mock.patch('homeassistant.config.open', mock_open, create=True), \
+                mock.patch('homeassistant.config.os.path.isfile', mock_isfile):
+            opened_file = mock_open.return_value
+            # pylint: disable=no-member
+            opened_file.readline.return_value = ha_version
+
+            self.hass.config.path = mock.Mock()
+
+            config_util.process_ha_config_upgrade(self.hass)
+
+        assert mock_os.rename.call_count == 0
 
     def test_loading_configuration(self):
         """Test loading core config onto hass object."""
@@ -502,7 +560,7 @@ def test_merge_once_only(merge_log_err):
         'mqtt': {}, 'api': {}
     }
     config_util.merge_packages_config(config, packages)
-    assert merge_log_err.call_count == 2
+    assert merge_log_err.call_count == 1
     assert len(config) == 3
 
 
@@ -514,7 +572,7 @@ def test_merge_id_schema(hass):
         'script': 'dict',
         'input_boolean': 'dict',
         'shell_command': 'dict',
-        'qwikswitch': '',
+        'qwikswitch': 'dict',
     }
     for name, expected_type in types.items():
         module = config_util.get_component(name)
@@ -539,7 +597,7 @@ def test_merge_duplicate_keys(merge_log_err):
     assert len(config['input_select']) == 1
 
 
-@pytest.mark.asyncio
+@asyncio.coroutine
 def test_merge_customize(hass):
     """Test loading core config onto hass object."""
     core_config = {

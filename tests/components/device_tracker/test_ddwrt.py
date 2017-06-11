@@ -8,7 +8,7 @@ import requests
 import requests_mock
 
 from homeassistant import config
-from homeassistant.bootstrap import setup_component
+from homeassistant.setup import setup_component
 from homeassistant.components import device_tracker
 from homeassistant.const import (
     CONF_PLATFORM, CONF_HOST, CONF_PASSWORD, CONF_USERNAME)
@@ -87,7 +87,7 @@ class TestDdwrt(unittest.TestCase):
                     }})
 
                 self.assertTrue(
-                    'Invalid response from ddwrt' in
+                    'Invalid response from DD-WRT' in
                     str(mock_error.call_args_list[-1]))
 
     @mock.patch('homeassistant.components.device_tracker._LOGGER.error')

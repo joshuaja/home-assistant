@@ -14,8 +14,9 @@ from homeassistant.components.envisalink import (
     SIGNAL_KEYPAD_UPDATE, SIGNAL_PARTITION_UPDATE)
 from homeassistant.helpers.entity import Entity
 
-DEPENDENCIES = ['envisalink']
 _LOGGER = logging.getLogger(__name__)
+
+DEPENDENCIES = ['envisalink']
 
 
 @asyncio.coroutine
@@ -46,13 +47,16 @@ class EnvisalinkSensor(EnvisalinkDevice, Entity):
         self._icon = 'mdi:alarm'
         self._partition_number = partition_number
 
-        _LOGGER.debug('Setting up sensor for partition: ' + partition_name)
+        _LOGGER.debug("Setting up sensor for partition: %s", partition_name)
         super().__init__(partition_name + ' Keypad', info, controller)
 
+    @asyncio.coroutine
+    def async_added_to_hass(self):
+        """Register callbacks."""
         async_dispatcher_connect(
-            hass, SIGNAL_KEYPAD_UPDATE, self._update_callback)
+            self.hass, SIGNAL_KEYPAD_UPDATE, self._update_callback)
         async_dispatcher_connect(
-            hass, SIGNAL_PARTITION_UPDATE, self._update_callback)
+            self.hass, SIGNAL_PARTITION_UPDATE, self._update_callback)
 
     @property
     def icon(self):

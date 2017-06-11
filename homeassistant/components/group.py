@@ -1,5 +1,5 @@
 """
-Provides functionality to group entities.
+Provide the functionality to group entities.
 
 For more details about this component, please refer to the documentation at
 https://home-assistant.io/components/group/
@@ -14,7 +14,7 @@ from homeassistant import config as conf_util, core as ha
 from homeassistant.const import (
     ATTR_ENTITY_ID, CONF_ICON, CONF_NAME, STATE_CLOSED, STATE_HOME,
     STATE_NOT_HOME, STATE_OFF, STATE_ON, STATE_OPEN, STATE_LOCKED,
-    STATE_UNLOCKED, STATE_UNKNOWN, ATTR_ASSUMED_STATE)
+    STATE_UNLOCKED, STATE_UNKNOWN, ATTR_ASSUMED_STATE, SERVICE_RELOAD)
 from homeassistant.core import callback
 from homeassistant.helpers.entity import Entity, async_generate_entity_id
 from homeassistant.helpers.entity_component import EntityComponent
@@ -42,7 +42,6 @@ SET_VISIBILITY_SERVICE_SCHEMA = vol.Schema({
     vol.Required(ATTR_VISIBLE): cv.boolean
 })
 
-SERVICE_RELOAD = 'reload'
 RELOAD_SERVICE_SCHEMA = vol.Schema({})
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,7 +64,7 @@ GROUP_SCHEMA = vol.Schema({
 })
 
 CONFIG_SCHEMA = vol.Schema({
-    DOMAIN: cv.ordered_dict(vol.All(_conf_preprocess, GROUP_SCHEMA))
+    DOMAIN: vol.Schema({cv.match_all: vol.All(_conf_preprocess, GROUP_SCHEMA)})
 }, extra=vol.ALLOW_EXTRA)
 
 # List of ON/OFF state tuples for groupable states
@@ -169,13 +168,13 @@ def get_entity_ids(hass, entity_id, domain_filter=None):
 
 @asyncio.coroutine
 def async_setup(hass, config):
-    """Setup all groups found definded in the configuration."""
+    """Set up all groups found definded in the configuration."""
     component = EntityComponent(_LOGGER, DOMAIN, hass)
 
     yield from _async_process_config(hass, config, component)
 
-    descriptions = yield from hass.loop.run_in_executor(
-        None, conf_util.load_yaml_config_file, os.path.join(
+    descriptions = yield from hass.async_add_job(
+        conf_util.load_yaml_config_file, os.path.join(
             os.path.dirname(__file__), 'services.yaml')
     )
 
@@ -395,17 +394,16 @@ class Group(Entity):
         self._state = STATE_UNKNOWN
         self._async_update_group_state()
 
-    @asyncio.coroutine
     def async_remove(self):
         """Remove group from HASS.
 
-        This method must be run in the event loop.
+        This method must be run in the event loop and returns a coroutine.
         """
         if self._async_unsub_state_changed:
             self._async_unsub_state_changed()
             self._async_unsub_state_changed = None
 
-        yield from super().async_remove()
+        return super().async_remove()
 
     @asyncio.coroutine
     def _async_state_changed_listener(self, entity_id, old_state, new_state):
@@ -422,7 +420,7 @@ class Group(Entity):
 
     @property
     def _tracking_states(self):
-        """The states that the group is tracking."""
+        """Return the states that the group is tracking."""
         states = []
 
         for entity_id in self.tracking:

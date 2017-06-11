@@ -9,9 +9,7 @@ from unittest.mock import patch
 
 from typing import Dict, List, Sequence
 
-import homeassistant.bootstrap as bootstrap
-import homeassistant.config as config_util
-import homeassistant.loader as loader
+from homeassistant import bootstrap, loader, setup, config as config_util
 import homeassistant.util.yaml as yaml
 from homeassistant.exceptions import HomeAssistantError
 
@@ -30,8 +28,8 @@ MOCKS = {
                config_util.async_log_exception),
     'package_error': ("homeassistant.config._log_pkg_error",
                       config_util._log_pkg_error),
-    'logger_exception': ("homeassistant.bootstrap._LOGGER.error",
-                         bootstrap._LOGGER.error),
+    'logger_exception': ("homeassistant.setup._LOGGER.error",
+                         setup._LOGGER.error),
 }
 SILENCE = (
     'homeassistant.bootstrap.clear_secret_cache',
@@ -52,7 +50,7 @@ def color(the_color, *args, reset=None):
     """Color helper."""
     from colorlog.escape_codes import escape_codes, parse_colors
     try:
-        if len(args) == 0:
+        if not args:
             assert reset is None, "You cannot reset if nothing being printed"
             return parse_colors(the_color)
         return parse_colors(the_color) + ' '.join(args) + \
@@ -108,7 +106,7 @@ def run(script_args: List) -> int:
             the_color = '' if yfn in res['yaml_files'] else 'red'
             print(color(the_color, '-', yfn))
 
-    if len(res['except']) > 0:
+    if res['except']:
         print(color('bold_white', 'Failed config'))
         for domain, config in res['except'].items():
             domain_info.append(domain)

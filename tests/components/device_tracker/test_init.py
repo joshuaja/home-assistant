@@ -10,21 +10,21 @@ import os
 
 from homeassistant.components import zone
 from homeassistant.core import callback, State
-from homeassistant.bootstrap import setup_component
+from homeassistant.setup import setup_component
 from homeassistant.helpers import discovery
 from homeassistant.loader import get_component
 from homeassistant.util.async import run_coroutine_threadsafe
 import homeassistant.util.dt as dt_util
 from homeassistant.const import (
     ATTR_ENTITY_ID, ATTR_ENTITY_PICTURE, ATTR_FRIENDLY_NAME, ATTR_HIDDEN,
-    STATE_HOME, STATE_NOT_HOME, CONF_PLATFORM)
+    STATE_HOME, STATE_NOT_HOME, CONF_PLATFORM, ATTR_ICON)
 import homeassistant.components.device_tracker as device_tracker
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.remote import JSONEncoder
 
 from tests.common import (
     get_test_home_assistant, fire_time_changed, fire_service_discovered,
-    patch_yaml_files, assert_setup_component, mock_restore_cache)
+    patch_yaml_files, assert_setup_component, mock_restore_cache, mock_coro)
 
 from ...test_util.aiohttp import mock_aiohttp_client
 
@@ -98,7 +98,7 @@ class TestComponentsDeviceTracker(unittest.TestCase):
         device = device_tracker.Device(
             self.hass, timedelta(seconds=180), True, dev_id,
             'AB:CD:EF:GH:IJ', 'Test name', picture='http://test.picture',
-            hide_if_away=True)
+            hide_if_away=True, icon='mdi:kettle')
         device_tracker.update_config(self.yaml_devices, dev_id, device)
         with assert_setup_component(1, device_tracker.DOMAIN):
             assert setup_component(self.hass, device_tracker.DOMAIN,
@@ -112,6 +112,7 @@ class TestComponentsDeviceTracker(unittest.TestCase):
         self.assertEqual(device.away_hide, config.away_hide)
         self.assertEqual(device.consider_home, config.consider_home)
         self.assertEqual(device.vendor, config.vendor)
+        self.assertEqual(device.icon, config.icon)
 
     # pylint: disable=invalid-name
     @patch('homeassistant.components.device_tracker._LOGGER.warning')
@@ -377,10 +378,11 @@ class TestComponentsDeviceTracker(unittest.TestCase):
         entity_id = device_tracker.ENTITY_ID_FORMAT.format(dev_id)
         friendly_name = 'Paulus'
         picture = 'http://placehold.it/200x200'
+        icon = 'mdi:kettle'
 
         device = device_tracker.Device(
             self.hass, timedelta(seconds=180), True, dev_id, None,
-            friendly_name, picture, hide_if_away=True)
+            friendly_name, picture, hide_if_away=True, icon=icon)
         device_tracker.update_config(self.yaml_devices, dev_id, device)
 
         with assert_setup_component(1, device_tracker.DOMAIN):
@@ -390,6 +392,7 @@ class TestComponentsDeviceTracker(unittest.TestCase):
         attrs = self.hass.states.get(entity_id).attributes
 
         self.assertEqual(friendly_name, attrs.get(ATTR_FRIENDLY_NAME))
+        self.assertEqual(icon, attrs.get(ATTR_ICON))
         self.assertEqual(picture, attrs.get(ATTR_ENTITY_PICTURE))
 
     def test_device_hidden(self):
@@ -521,7 +524,9 @@ class TestComponentsDeviceTracker(unittest.TestCase):
                                             timedelta(seconds=0))
         assert len(config) == 0
 
-    def test_see_state(self):
+    @patch('homeassistant.components.device_tracker.Device'
+           '.set_vendor_for_mac', return_value=mock_coro())
+    def test_see_state(self, mock_set_vendor):
         """Test device tracker see records state correctly."""
         self.assertTrue(setup_component(self.hass, device_tracker.DOMAIN,
                                         TEST_PLATFORM))
